@@ -193,7 +193,9 @@ typedef struct FLAC__StreamDecoderPrivate {
 	FLAC__bool do_md5_checking; /* initially gets protected_->md5_checking but is turned off after a seek or if the metadata has a zero MD5 */
 	FLAC__bool internal_reset_hack; /* used only during init() so we can call reset to set up the decoder without rewinding the input */
 	FLAC__bool is_seeking;
+#ifndef FLAC__NO_MD5
 	FLAC__MD5Context md5context;
+#endif
 	FLAC__byte computed_md5sum[16]; /* this is the sum we computed from the decoded data */
 	/* (the rest of these are only used for seeking) */
 	FLAC__Frame last_frame; /* holds the info of the last frame we seeked to */
@@ -672,10 +674,12 @@ FLAC_API FLAC__bool FLAC__stream_decoder_finish(FLAC__StreamDecoder *decoder)
 	if(decoder->protected_->state == FLAC__STREAM_DECODER_UNINITIALIZED)
 		return true;
 
+#ifndef FLAC__NO_MD5
 	/* see the comment in FLAC__seekable_stream_decoder_reset() as to why we
 	 * always call FLAC__MD5Final()
 	 */
 	FLAC__MD5Final(decoder->private_->computed_md5sum, &decoder->private_->md5context);
+#endif
 
 	if(decoder->private_->has_seek_table && 0 != decoder->private_->seek_table.data.seek_table.points) {
 		free(decoder->private_->seek_table.data.seek_table.points);
@@ -1021,6 +1025,7 @@ FLAC_API FLAC__bool FLAC__stream_decoder_reset(FLAC__StreamDecoder *decoder)
 	 */
 	decoder->private_->fixed_block_size = decoder->private_->next_fixed_block_size = 0;
 
+#ifndef FLAC__NO_MD5
 	/* We initialize the FLAC__MD5Context even though we may never use it.  This
 	 * is because md5 checking may be turned on to start and then turned off if
 	 * a seek occurs.  So we init the context here and finalize it in
@@ -1028,6 +1033,7 @@ FLAC_API FLAC__bool FLAC__stream_decoder_reset(FLAC__StreamDecoder *decoder)
 	 * properly.
 	 */
 	FLAC__MD5Init(&decoder->private_->md5context);
+#endif
 
 	decoder->private_->first_frame_offset = 0;
 	decoder->private_->unparseable_frame_count = 0;
@@ -2953,10 +2959,12 @@ FLAC__StreamDecoderWriteStatus write_audio_frame_to_client_(FLAC__StreamDecoder 
 		 */
 		if(!decoder->private_->has_stream_info)
 			decoder->private_->do_md5_checking = false;
+#ifndef FLAC__NO_MD5
 		if(decoder->private_->do_md5_checking) {
 			if(!FLAC__MD5Accumulate(&decoder->private_->md5context, buffer, frame->header.channels, frame->header.blocksize, (frame->header.bits_per_sample+7) / 8))
 				return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
 		}
+#endif
 		return decoder->private_->write_callback(decoder, frame, buffer, decoder->private_->client_data);
 	}
 }
